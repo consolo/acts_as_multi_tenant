@@ -153,6 +153,34 @@ class MiddlewareTest < Minitest::Test
     assert_equal 404, status
   end
 
+  def test_global_paths_and_global_identifiers_work_together
+    app = ->(env) {
+      [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
+    }
+    ware = MultiTenant::Middleware.new(app, {
+      model: Client,
+      identifier: ->(req) { 'api' },
+      global_identifiers: %w(api),
+      global_paths: ['/about']
+    })
+    status, _, _ = ware.call({'PATH_INFO' => '/about'})
+    assert_equal 200, status
+  end
+
+  def test_global_paths_fail_if_globa_identifier_fails
+    app = ->(env) {
+      [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
+    }
+    ware = MultiTenant::Middleware.new(app, {
+      model: Client,
+      identifier: ->(req) { 'foo' },
+      global_identifiers: %w(api),
+      global_paths: ['/about']
+    })
+    status, _, _ = ware.call({'PATH_INFO' => '/about'})
+    assert_equal 404, status
+  end
+
   def test_tenant_isolation
     app = ->(env) {
       refute_nil Client.current
