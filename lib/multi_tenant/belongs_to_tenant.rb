@@ -25,7 +25,7 @@ module MultiTenant
       cattr_accessor :tenant_class, :tenant_foreign_key, :tenant_primary_key
       self.tenant_class = reflection.klass
       self.tenant_foreign_key = reflection.foreign_key.to_sym
-      self.tenant_primary_key = reflection.active_record_primary_key.to_sym
+      self.tenant_primary_key = reflection.association_primary_key.to_sym
 
       before_validation :assign_to_tenant
       validates_presence_of tenant_foreign_key
