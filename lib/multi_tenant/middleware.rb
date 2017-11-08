@@ -86,7 +86,7 @@ module MultiTenant
         end
       end
 
-      tenant_record = tenant_identifier.present? ? tenant_class.where({tenant_class.tenant_identifier => tenant_identifier}).first : nil
+      tenant_record = tenant_class.where({tenant_class.tenant_identifier => tenant_identifier}).first
       if tenant_record
         tenant_class.current = tenant_record
         return @app.call env
