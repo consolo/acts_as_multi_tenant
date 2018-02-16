@@ -89,7 +89,11 @@ class MiddlewareTest < Minitest::Test
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
       identifier: ->(req) { 'api' },
-      global_identifiers: %w(api)
+      globals: {
+        "api" => {
+          /.*/ => :any
+        }
+      }
     })
     status, _header, body = ware.call({})
     assert_equal 200, status
@@ -103,7 +107,11 @@ class MiddlewareTest < Minitest::Test
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
       identifier: ->(req) { 'foo' },
-      global_identifiers: %w(api)
+      globals: {
+        "api" => {
+          /.*/ => :any
+        }
+      }
     })
     status, _header, body = ware.call({})
     assert_equal 404, status
@@ -116,8 +124,12 @@ class MiddlewareTest < Minitest::Test
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
-      identifier: ->(req) { nil },
-      global_paths: ['/about']
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          "/about" => :any
+        }
+      }
     })
     status, headers, body = ware.call({'PATH_INFO' => '/about'})
     assert_equal 200, status
@@ -131,10 +143,52 @@ class MiddlewareTest < Minitest::Test
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
-      identifier: ->(req) { nil },
-      global_paths: [%r{^/v\d+/about$}]
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          %r{\A/v\d+/about\Z} => :any
+        }
+      }
     })
     status, headers, body = ware.call({'PATH_INFO' => '/v2/about'})
+    assert_equal 200, status
+    assert_equal 'text/plain', headers['Content-Type']
+    assert_match (/yay/i), body.join('')
+  end
+
+  def test_global_path_method
+    app = ->(env) {
+      [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
+    }
+    ware = MultiTenant::Middleware.new(app, {
+      model: Client,
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          %r{\A/v\d+/about\Z} => :get
+        }
+      }
+    })
+    status, headers, body = ware.call({'PATH_INFO' => '/v2/about', 'REQUEST_METHOD' => 'GET'})
+    assert_equal 200, status
+    assert_equal 'text/plain', headers['Content-Type']
+    assert_match (/yay/i), body.join('')
+  end
+
+  def test_global_path_methods
+    app = ->(env) {
+      [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
+    }
+    ware = MultiTenant::Middleware.new(app, {
+      model: Client,
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          %r{\A/v\d+/about\Z} => [:post, :get]
+        }
+      }
+    })
+    status, headers, body = ware.call({'PATH_INFO' => '/v2/about', 'REQUEST_METHOD' => 'GET'})
     assert_equal 200, status
     assert_equal 'text/plain', headers['Content-Type']
     assert_match (/yay/i), body.join('')
@@ -146,38 +200,31 @@ class MiddlewareTest < Minitest::Test
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
-      identifier: ->(req) { nil },
-      global_paths: ['/about', %r{^/v\d+/about$}]
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          %r{\A/v\d+/about\Z} => :any
+        }
+      }
     })
     status, _, _ = ware.call({'PATH_INFO' => '/foo/about'})
     assert_equal 404, status
   end
 
-  def test_global_paths_and_global_identifiers_work_together
+  def test_global_path_methods_fail
     app = ->(env) {
       [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
-      identifier: ->(req) { 'api' },
-      global_identifiers: %w(api),
-      global_paths: ['/about']
+      identifier: ->(req) { "api" },
+      globals: {
+        "api" => {
+          "/foo" => [:post, :patch]
+        }
+      }
     })
-    status, _, _ = ware.call({'PATH_INFO' => '/about'})
-    assert_equal 200, status
-  end
-
-  def test_global_paths_fail_if_globa_identifier_fails
-    app = ->(env) {
-      [200, {'Content-Type' => 'text/plain'}, ['Yay!']]
-    }
-    ware = MultiTenant::Middleware.new(app, {
-      model: Client,
-      identifier: ->(req) { 'foo' },
-      global_identifiers: %w(api),
-      global_paths: ['/about']
-    })
-    status, _, _ = ware.call({'PATH_INFO' => '/about'})
+    status, _headers, _body = ware.call({'PATH_INFO' => '/foo', 'REQUEST_METHOD' => 'GET'})
     assert_equal 404, status
   end
 
@@ -224,10 +271,14 @@ class MiddlewareTest < Minitest::Test
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
       identifier: ->(req) { req.env['CLIENT_CODE'] },
-      global_paths: ['/about']
+      globals: {
+        "foo" => {
+          %r{/about} => :get
+        }
+      }
     })
 
-    status, _, body = ware.call({'PATH_INFO' => '/about'})
+    status, _, body = ware.call({'PATH_INFO' => '/about', 'REQUEST_METHOD' => 'GET', 'CLIENT_CODE' => 'foo'})
     assert_equal 200, status
     assert_equal ":4", body.join('')
     assert_nil Client.current

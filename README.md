@@ -21,19 +21,19 @@ use MultiTenant::Middleware,
   # (required) Fetch the identifier of the current tenant from a Rack::Request object
   identifier: ->(req) { req.host.split(/\./)[0] },
 
-  # (optional) Array of tentants that don't exist in the database, but should be allowed through anyway.
-  # IMPORTANT For these, Tenant.current will be nil!
-  global_identifiers: %w(global),
+  # (optional) A Hash of fake identifiers that should be allowed through. Each identifier will have a
+  # Hash of Regex paths with Symbol http methods (or arrays thereof), or :any. These path & method combos
+  # will be allowed through when the identifier matches. All others will be blocked.
+  # IMPORTANT Tenant.current will be nil!
+  globals: {
+    "global" => {
+      %r{\A/api/widgets/} => :any,
+      %r{\A/api/splines/} => [:get, :post]
+    }
+  },
 
-  # (optional) Array of Strings or Regexps for paths that don't require a tenant. Only applies 
-  # when the tenant isn't specified in the request - not when a given tenant can't be found.
-  global_paths: [
-    '/about',
-    %r{^/api/v\d+/login$},
-  ],
-
-  # (optional) Returns a Rack response when a tenant couldn't be found in the db, or when
-  # a tenant isn't given (and isn't in the `global_paths` list)
+  # (optional) Returns a Rack response when a tenant couldn't be found in the db (excluding globals),
+  # or when a tenant isn't given.
   not_found: ->(x) {
     body = {errors: ["'%s' is not a valid tenant!" % x]}.to_json
     [400, {'Content-Type' => 'application/json', 'Content-Length' => body.size.to_s}, [body]]
