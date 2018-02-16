@@ -76,7 +76,6 @@ module MultiTenant
       request = Rack::Request.new env
       tenant_identifier = identifier.(request)
 
-
       if (allowed_paths = globals[tenant_identifier])
         allowed = path_matches?(request, allowed_paths)
         return allowed ? @app.call(env) : not_found.(tenant_identifier)
