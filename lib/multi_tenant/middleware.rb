@@ -93,7 +93,7 @@ module MultiTenant
 
     def path_matches?(req, paths)
       paths.any? { |(path, methods)|
-        (path == req.path || path =~ req.path) && (methods == :any || methods.include?(req.request_method))
+        path === req.path && (methods == :any || methods.include?(req.request_method))
       }
     end
 
