@@ -15,8 +15,8 @@ module MultiTenant
     # @param scope [Proc] (optional) Proc holding an Arel scope for the lookup - same that the normal `belongs_to` method accepts.
     # @param options [Hash] (optional) Hash with association options - same that the normal `belongs_to` methods accepts.
     #
-    def belongs_to_tenant(association_name, scope = nil, options = {})
-      belongs_to association_name, scope, options
+    def belongs_to_tenant(association_name, scope = nil, **options)
+      belongs_to association_name, scope, **options
       reflection = reflections[association_name.to_s]
       unless reflection.klass.acts_as_tenant? or reflection.klass.proxies_to_tenant?
         raise "`belongs_to_tenant :#{association_name}` failed because #{reflection.klass.name} has not used `acts_as_tenant` or `proxies_to_tenant`."
