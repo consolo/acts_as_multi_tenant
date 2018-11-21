@@ -9,13 +9,22 @@ module MultiTenant
     #
     # Use this ActiveRecord model as the tenant source.
     #
-    # @param using [String] (optional) column that contains the unique lookup identifier. Defaults to :code.
+    # The "current" option allows you to specify whether Client.current is a single record (the default) or an array of records.
     #
-    def acts_as_tenant(using: :code)
-      cattr_accessor :tenant_identifier, :tenant_thread_var
+    # @param using [String] (optional) column that contains the unique lookup identifier. Defaults to :code.
+    # @param current [Symbol] :single | :multiple
+    #
+    def acts_as_tenant(using: :code, current: :single)
+      cattr_accessor :tenant_identifier, :tenant_thread_var, :multi_tenant_impl
       self.tenant_identifier = using
       self.tenant_thread_var = "current_tenant_#{object_id}".freeze # allows there to be multiple tenant classes
+      self.multi_tenant_impl = case current
+                               when :single then MultiTenant::Impl::SingleCurrent.new(self)
+                               when :multiple then MultiTenant::Impl::MultipleCurrent.new(self)
+                               else raise ArgumentError, "Unknown current option '#{current}'"
+                               end
       self.extend MultiTenant::ActsAsTenant::ClassMethods
+      self.extend self.multi_tenant_impl.acts_as_tenant_class_methods
     end
 
     #
@@ -60,13 +69,7 @@ module MultiTenant
       # @param record_or_identifier the record or the identifier in the 'tenant_identifier' column.
       #
       def current=(record_or_identifier)
-        obj = if record_or_identifier.is_a? self
-                record_or_identifier
-              elsif record_or_identifier
-                where({tenant_identifier => record_or_identifier}).first
-              else
-                nil
-              end
+        obj = resolve_tenant record_or_identifier
         Thread.current.thread_variable_set tenant_thread_var, obj
       end
 
@@ -102,7 +105,7 @@ module MultiTenant
       #
       def without_tenant
         old_current = self.current
-        self.current = nil
+        self.current = resolve_tenant nil
         yield if block_given?
       ensure
         self.current = old_current

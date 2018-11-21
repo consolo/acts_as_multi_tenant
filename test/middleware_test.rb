@@ -65,7 +65,7 @@ class MiddlewareTest < Minitest::Test
     })
     status, _, body = ware.call({})
     assert_equal 404, status
-    assert_match (/'foo' is not a valid tenant/i), body.join('')
+    assert_match (/Invalid tenant: foo/i), body.join('')
   end
 
   def test_custom_not_found
@@ -115,7 +115,7 @@ class MiddlewareTest < Minitest::Test
     })
     status, _header, body = ware.call({})
     assert_equal 404, status
-    assert_match (/'foo' is not a valid tenant/i), body.join('')
+    assert_match (/Invalid tenant: foo/i), body.join('')
   end
 
   def test_global_path_strings
@@ -253,12 +253,12 @@ class MiddlewareTest < Minitest::Test
       identifier: ->(req) { req.env['CLIENT_CODE'] }
     })
 
-    status, headers, body = ware.call({'CLIENT_CODE' => 'acme'})
+    status, _headers, body = ware.call({'CLIENT_CODE' => 'acme'})
     assert_equal 200, status
     assert_equal "acme:1", body.join('')
     assert_nil Client.current
 
-    status, headers, body = ware.call({'CLIENT_CODE' => 'corp'})
+    status, _headers, body = ware.call({'CLIENT_CODE' => 'corp'})
     assert_equal 200, status
     assert_equal "corp:3", body.join('')
     assert_nil Client.current

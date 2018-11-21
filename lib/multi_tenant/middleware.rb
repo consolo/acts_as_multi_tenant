@@ -47,7 +47,8 @@ module MultiTenant
 
     # Default Proc for the not_found option
     DEFAULT_NOT_FOUND = ->(x) {
-      [404, {'Content-Type' => 'text/html', 'Content-Length' => (33 + x.to_s.size).to_s}, ['<h1>\'%s\' is not a valid tenant</h1>' % x.to_s]]
+      body = "<h1>Invalid tenant: #{Array(x).map(&:to_s).join ', '}</h1>"
+      [404, {'Content-Type' => 'text/html', 'Content-Length' => body.size.to_s}, [body]]
     }
 
     #
@@ -73,15 +74,18 @@ module MultiTenant
     # Rack request call
     def call(env)
       tenant_class.current = nil
+      impl = tenant_class.multi_tenant_impl
+
       request = Rack::Request.new env
       tenant_identifier = identifier.(request)
 
-      if (allowed_paths = globals[tenant_identifier])
-        allowed = path_matches?(request, allowed_paths)
+      if (matching_globals = impl.matching_globals(tenant_identifier, globals)).any?
+        allowed = matching_globals.any? { |allowed_paths|
+          path_matches?(request, allowed_paths)
+        }
         return allowed ? @app.call(env) : not_found.(tenant_identifier)
 
-      elsif (tenant = tenant_class.where({tenant_class.tenant_identifier => tenant_identifier}).first)
-        tenant_class.current = tenant
+      elsif (tenant_class.current = tenant_identifier) and tenant_class.current?
         return @app.call env
 
       else

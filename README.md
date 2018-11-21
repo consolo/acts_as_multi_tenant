@@ -1,6 +1,6 @@
 # acts_as_multi_tenant
 
-Keep multiple tenants in a single ActiveRecord database, and keep their data separate. Let's say the `Client` AR model represents your "tenants". Some Rack middleware will keep track of the "current" client in the request cycle, which will automatically filter *all ActiveRecord queries* by that client, and automatically associate new records to the client as well.
+Keep multiple tenants in a single ActiveRecord database, and keep their data separate. Let's say the `Client` AR model represents your "tenants". Rack middleware will keep track of the "current" client in the request cycle which will automatically filter *all ActiveRecord queries* by that client. New records will automatically be associated to that client as well.
 
 There are 3 main components:
 
@@ -10,7 +10,7 @@ There are 3 main components:
 
 ## MultiTenant::Middleware
 
-Add the middleware in **config.ru**, or wherever you add middleware.
+Add the middleware in **config.ru** or wherever you add middleware.
 
 ```ruby
 use MultiTenant::Middleware,
@@ -113,6 +113,27 @@ end
 
 # This is how it works behind the scenes
 License.current == Client.current.license
+```
+
+## Multiple current tenants
+
+Some applications may need to allow multiple current tenants at once. For example, a single user account may have access to multiple clients. `acts_as_multi_tenant` supports this with the `current: :multiple` option. When this is set, `Client.current` will be an array of clients. Queries will be filtered to ANY of those clients.
+
+```ruby
+class Client < ActiveRecord::Base
+  acts_as_tenant using: :code, current: :multiple
+end
+```
+
+When you add your middleware, your `identifier` option must also return an array:
+
+```ruby
+use MultiTenant::Middleware,
+  model: -> { Client.active },
+
+  identifier: ->(req) {
+    req.params["clients"] || []
+  }
 ```
 
 ## Testing

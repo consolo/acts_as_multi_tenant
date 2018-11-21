@@ -27,17 +27,10 @@ module MultiTenant
       self.tenant_foreign_key = reflection.foreign_key.to_sym
       self.tenant_primary_key = reflection.association_primary_key.to_sym
 
-      before_validation :assign_to_tenant
+      include tenant_class.multi_tenant_impl.belongs_to_tenant_instance_methods
+      default_scope(&tenant_class.multi_tenant_impl.belongs_to_tenant_default_scope(self))
+
       validates_presence_of tenant_foreign_key
-
-      self.class_eval do
-        include MultiTenant::BelongsToTenant::InstanceMethods
-
-        default_scope {
-          current = tenant_class.current
-          current ? where({tenant_foreign_key => current.send(tenant_primary_key)}) : where('1=1')
-        }
-      end
     end
 
     #
@@ -47,22 +40,6 @@ module MultiTenant
     #
     def belongs_to_tenant?
       respond_to? :tenant_class
-    end
-
-    #
-    # Instance methods given to tenant-owned models.
-    #
-    module InstanceMethods
-      private
-
-      #
-      # Assign this model to the current tenant (if any)
-      #
-      def assign_to_tenant
-        if self.class.tenant_class.current and send(self.class.tenant_foreign_key).blank?
-          send "#{self.class.tenant_foreign_key}=", self.class.tenant_class.current.send(self.class.tenant_primary_key)
-        end
-      end
     end
   end
 end
