@@ -59,7 +59,7 @@ module MultiTenant
       # @return the current tenant record
       #
       def current
-        Thread.current.thread_variable_get tenant_thread_var
+        Thread.current.thread_variable_get(tenant_thread_var) || resolve_tenant(nil)
       end
 
       #
