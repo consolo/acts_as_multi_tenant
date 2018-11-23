@@ -52,17 +52,14 @@ module MultiTenant
       raise "`proxies_to_tenant :#{association_name}`: #{reflection.klass.name} must use `acts_as_tenant`" if !reflection.klass.acts_as_tenant?
       raise "`proxies_to_tenant :#{association_name}`: the `:#{association_name}` association must use the `:inverse_of` option." if reflection.inverse_of.nil?
 
-      case [reflection.macro, reflection.inverse_of.macro]
-      when [:has_many, :belongs_to], [:has_one, :belongs_to], [:belongs_to, :has_one]
-        self.extend SingularInverseAssociation
-      else
-        raise "`proxies_to_tenant` does not currently support `#{reflection.macro}` associations with `#{reflection.inverse_of.macro} inverses."
-      end
-
       cattr_accessor :proxied_tenant_class, :proxied_tenant_inverse_assoc, :proxied_tenant_inverse_scope
       self.proxied_tenant_class = reflection.klass
       self.proxied_tenant_inverse_assoc = reflection.inverse_of.name
       self.proxied_tenant_inverse_scope = scope
+
+      impl = self.proxied_tenant_class.multi_tenant_impl
+      self.extend impl.proxies_to_tenant_class_methods(reflection)
+      self.extend ClassMethods
     end
 
     #
@@ -74,25 +71,12 @@ module MultiTenant
       respond_to? :proxied_tenant_class
     end
 
-    private
-
-    # Class methods for tenant proxies that have a singular inverse association (i.e. belongs_to or has_one).
-    module SingularInverseAssociation
-      # Returns the "current" record of the proxy model
-      def current
-        if (tenant = proxied_tenant_class.current)
-          tenant.send proxied_tenant_inverse_assoc
-        end
-      end
-    end
-
-    # NOTE just some thoughts on *maybe* how to support this if we ever need it.
-    module PluralInverseAssociation
-      # Returns the "current" record of the proxy model
-      def current
-        if (tenant = proxied_tenant_class.current)
-          tenant.send(proxied_tenant_inverse_assoc).instance_eval(&proxied_tenant_inverse_scope).first
-        end
+    #
+    # Class methods given to proxies.
+    #
+    module ClassMethods
+      def multi_tenant_impl
+        proxied_tenant_class.multi_tenant_impl
       end
     end
   end
