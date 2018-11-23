@@ -55,10 +55,6 @@ module MultiTenant
       # Class methods given to the tenant model.
       #
       module ActsAsTenantClassMethods
-        def self.extended(model)
-          model.current = []
-        end
-
         def current?
           !current.nil? && current.any?
         end
