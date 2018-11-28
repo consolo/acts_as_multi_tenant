@@ -27,10 +27,16 @@ module MultiTenant
       self.tenant_foreign_key = reflection.foreign_key.to_sym
       self.tenant_primary_key = reflection.association_primary_key.to_sym
 
-      include tenant_class.multi_tenant_impl.belongs_to_tenant_instance_methods
-      default_scope(&tenant_class.multi_tenant_impl.belongs_to_tenant_default_scope(self))
+      include MultiTenant::BelongsToTenant::InstanceMethods
 
+      before_validation :assign_to_current_tenant
       validates_presence_of tenant_foreign_key
+      validate :ensure_assigned_to_current_tenants
+
+      default_scope {
+        current = tenant_class.current_tenants.map(&tenant_primary_key)
+        current.any? ? where({tenant_foreign_key => current}) : where('1=1')
+      }
     end
 
     #
@@ -40,6 +46,33 @@ module MultiTenant
     #
     def belongs_to_tenant?
       respond_to? :tenant_class
+    end
+
+    module InstanceMethods
+      private
+
+      #
+      # Assign this model to the current tenant (if any). If there are multiple current tenants this is a no-op.
+      #
+      def assign_to_current_tenant
+        if self.class.tenant_class.current_tenants.size == 1
+          current_tenant_id = self.class.tenant_class.current_tenant.send(self.class.tenant_primary_key)
+          send "#{self.class.tenant_foreign_key}=", current_tenant_id
+        end
+      end
+
+      #
+      # If the tenant_id is set, make sure it's one of the current ones.
+      #
+      def ensure_assigned_to_current_tenants
+        _tenants_ids = self.class.tenant_class.current_tenants.map { |t|
+          t.send(self.class.tenant_primary_key).to_s
+        }
+        _current_id = send self.class.tenant_foreign_key
+        if _tenants_ids.any? and _current_id.present? and !_tenants_ids.include?(_current_id.to_s)
+          errors.add(self.class.tenant_foreign_key, "is incorrect")
+        end
+      end
     end
   end
 end

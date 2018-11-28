@@ -47,19 +47,24 @@ module MultiTenant
     # @param scope [Proc] (optional) An AR scope that will be run *against the proxy model*, i.e. *this* model. Useful for when the association's `:inverse_of` is a `has_many` or `has_many_and_belongs_to`.
     #
     def proxies_to_tenant(association_name, scope = nil)
-      reflection = reflections[association_name.to_s]
-      raise "`proxies_to_tenant :#{association_name}`: unable to find association `:#{association_name}`. Make sure you create the association *first*." if reflection.nil?
-      raise "`proxies_to_tenant :#{association_name}`: #{reflection.klass.name} must use `acts_as_tenant`" if !reflection.klass.acts_as_tenant?
-      raise "`proxies_to_tenant :#{association_name}`: the `:#{association_name}` association must use the `:inverse_of` option." if reflection.inverse_of.nil?
+      ref = reflections[association_name.to_s]
+      raise "`proxies_to_tenant :#{association_name}`: unable to find association `:#{association_name}`. Make sure you create the association *first*." if ref.nil?
+      raise "`proxies_to_tenant :#{association_name}`: #{ref.klass.name} must use `acts_as_tenant`" if !ref.klass.acts_as_tenant?
+      raise "`proxies_to_tenant :#{association_name}`: the `:#{association_name}` association must use the `:inverse_of` option." if ref.inverse_of.nil?
 
       cattr_accessor :proxied_tenant_class, :proxied_tenant_inverse_assoc, :proxied_tenant_inverse_scope
-      self.proxied_tenant_class = reflection.klass
-      self.proxied_tenant_inverse_assoc = reflection.inverse_of.name
+      self.proxied_tenant_class = ref.klass
+      self.proxied_tenant_inverse_assoc = ref.inverse_of.name
       self.proxied_tenant_inverse_scope = scope
 
-      impl = self.proxied_tenant_class.multi_tenant_impl
-      self.extend impl.proxies_to_tenant_class_methods(reflection)
-      self.extend ClassMethods
+      extend MultiTenant::ActsAsTenant::TenantGetters
+      extend case [ref.macro, ref.inverse_of.macro]
+             when [:has_many, :belongs_to], [:has_one, :belongs_to], [:belongs_to, :has_one]
+               ProxiesToTenantSingularInverseAssociation
+             else
+               raise MultiTenant::NotImplemented, "`proxies_to_tenant` does not currently support `#{ref.macro}` associations with `#{ref.inverse_of.macro} inverses."
+               ProxiesToTenantPluralInverseAssociation
+             end
     end
 
     #
@@ -72,11 +77,28 @@ module MultiTenant
     end
 
     #
-    # Class methods given to proxies.
+    # Class methods for tenant proxies that have a singular inverse association (i.e. belongs_to or has_one).
     #
-    module ClassMethods
-      def multi_tenant_impl
-        proxied_tenant_class.multi_tenant_impl
+    module ProxiesToTenantSingularInverseAssociation
+      # Returns the current record of the proxy model
+      def current_tenants
+        proxied_tenant_class
+          .current_tenants
+          .map(&proxied_tenant_inverse_assoc)
+      end
+    end
+
+    #
+    # Class methods for tenant proxies that have a plural inverse association (i.e. has_many).
+    # NOTE These are just some thoughts on *maybe* how to support this if we ever need it.
+    #
+    module ProxiesToTenantPluralInverseAssociation
+      # Returns the current record of the proxy model
+      def current_tenant
+        raise MultiTenant::NotImplemented, "needs confirmed"
+        if (tenant = proxied_tenant_class.current_tenant)
+          tenant.send(proxied_tenant_inverse_assoc).instance_eval(&proxied_tenant_inverse_scope).first
+        end
       end
     end
   end

@@ -3,7 +3,7 @@ require 'test_helper'
 class MultipleCurrentTest < Minitest::Test
   class Client < ActiveRecord::Base
     self.table_name = "clients"
-    acts_as_tenant using: :code, current: :multiple
+    acts_as_tenant using: :code
   end
 
   class Widget < ActiveRecord::Base
@@ -26,28 +26,28 @@ class MultipleCurrentTest < Minitest::Test
   end
 
   def teardown
-    Client.current = []
+    Client.current_tenants = []
     DatabaseCleaner.clean
   end
 
   def test_current_one
-    assert_equal [], Client.current
+    assert_equal [], Client.current_tenants
 
-    Client.current = [@client1]
-    assert_equal [@client1], Client.current
+    Client.current_tenants = [@client1]
+    assert_equal [@client1], Client.current_tenants
 
-    Client.current = [@client1.code]
-    assert_equal [@client1], Client.current
+    Client.current_tenants = [@client1.code]
+    assert_equal [@client1], Client.current_tenants
   end
 
   def test_current_two
-    assert_equal [], Client.current
+    assert_equal [], Client.current_tenants
 
-    Client.current = [@client1, @client2]
-    assert_equal [@client1, @client2], Client.current
+    Client.current_tenants = [@client1, @client2]
+    assert_equal [@client1, @client2], Client.current_tenants
 
-    Client.current = [@client1.code, @client2.code]
-    assert_equal [@client1, @client2], Client.current
+    Client.current_tenants = [@client1.code, @client2.code]
+    assert_equal [@client1, @client2], Client.current_tenants
   end
 
   def test_isolates_records
@@ -79,7 +79,7 @@ class MultipleCurrentTest < Minitest::Test
 
   def test_middleware_global_identifiers_match
     app = ->(env) {
-      [200, {'Content-Type' => 'text/plain'}, ["#{Client.current.size} current clients"]]
+      [200, {'Content-Type' => 'text/plain'}, ["#{Client.current_tenants.size} current clients"]]
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,
@@ -119,9 +119,9 @@ class MultipleCurrentTest < Minitest::Test
     _widget3 = Widget.create!(client_id: @client3.id, name: 'Zorp')
 
     app = ->(env) {
-      assert_equal %w(bar foo), Client.current.map(&:code).sort
+      assert_equal %w(bar foo), Client.current_tenants.map(&:code).sort
       assert_equal %w(Bar Foo), Widget.all.pluck(:name).sort
-      [200, {'Content-Type' => 'text/plain'}, ["Current are #{Client.current.map(&:code).sort.join ", "}"]]
+      [200, {'Content-Type' => 'text/plain'}, ["Current are #{Client.current_tenants.map(&:code).sort.join ", "}"]]
     }
     ware = MultiTenant::Middleware.new(app, {
       model: Client,

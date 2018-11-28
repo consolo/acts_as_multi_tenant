@@ -22,8 +22,16 @@ module MultiTenant
       cattr_accessor :delegate_class
       self.delegate_class = ref.klass
 
-      impl = self.delegate_class.tenant_class.multi_tenant_impl
-      default_scope(&impl.belongs_to_tenant_through_default_scope(self, ref))
+      default_scope {
+        tenants = delegate_class.tenant_class.current_tenants
+        next where('1=1') if tenants.empty?
+
+        # Using straight sql so we can JOIN against two columns. Otherwise one must go into "WHERE", and Arel would apply it to UPDATEs and DELETEs.
+        quoted_tenant_ids = tenants.map { |t| connection.quote t.send delegate_class.tenant_primary_key }
+        joins("INNER JOIN #{ref.klass.table_name} ON #{ref.klass.table_name}.#{ref.foreign_key}=#{table_name}.#{ref.association_primary_key} AND #{ref.klass.table_name}.#{ref.klass.tenant_foreign_key} IN (#{quoted_tenant_ids.join(',')})").
+          distinct.
+          readonly(false) # using "joins" makes records readonly, which we don't want
+      }
     end
 
     #

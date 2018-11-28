@@ -1,6 +1,6 @@
 # acts_as_multi_tenant
 
-Keep multiple tenants in a single ActiveRecord database, and keep their data separate. Let's say the `Client` AR model represents your "tenants". Rack middleware will keep track of the "current" client in the request cycle which will automatically filter *all ActiveRecord queries* by that client. New records will automatically be associated to that client as well.
+Keep multiple tenants in a single ActiveRecord database and keep their data separate. Let's say the `Client` AR model represents your "tenants". Rack middleware will keep track of the current client in the request cycle which will automatically filter *all ActiveRecord queries* by that client. New records will automatically be associated to that client as well.
 
 There are 3 main components:
 
@@ -117,23 +117,31 @@ License.current == Client.current.license
 
 ## Multiple current tenants
 
-Some applications may need to allow multiple current tenants at once. For example, a single user account may have access to multiple clients. `acts_as_multi_tenant` supports this with the `current: :multiple` option. When this is set, `Client.current` will be an array of clients. Queries will be filtered to ANY of those clients.
+Some applications may need to allow multiple current tenants at once. For example, a single user may have access to multiple clients. `acts_as_multi_tenant` has an API that allows getting and setting of multiple tenants. Queries will be filtered by ANY of them. Keep in mind that when creating new records the tenant_id column cannot automatically be set, since it doesn't know which tenant to use.
 
-```ruby
-class Client < ActiveRecord::Base
-  acts_as_tenant using: :code, current: :multiple
-end
-```
-
-When you add your middleware, your `identifier` option must also return an array:
+When you add your middleware, the `identifiers` option must return an array:
 
 ```ruby
 use MultiTenant::Middleware,
   model: -> { Client.active },
 
-  identifier: ->(req) {
+  identifiers: ->(req) {
     req.params["clients"] || []
   }
+```
+
+In application code, use the following pluralized methods instead of their singularized counterparts:
+
+```ruby
+Client.current_tenants = ["acme", "foo"]
+
+Client.with_tenants ["acme", "foo"] do
+  # do stuff
+end
+
+Client.without_tenants do
+  # do stuff
+end
 ```
 
 ## Testing

@@ -10,7 +10,8 @@ module MultiTenant
   #     # The ActiveRecord model that represents the tenants. Or a Proc returning it, or it's String name.
   #     model: -> { Tenant },
   #
-  #     # A Proc that returns the tenant identifier that's used to look up the tenant. (i.e. :using option passed to acts_as_tenant)
+  #     # A Proc that returns the tenant identifier that's used to look up the tenant. (i.e. :using option passed to acts_as_tenant).
+  #     # Also aliased as "identifiers".
   #     identifier: ->(req) { req.host.split(/\./)[0] },
   #
   #     # (optional) A Hash of fake identifiers that should be allowed through. Each identifier will have a
@@ -61,6 +62,7 @@ module MultiTenant
       @app = app
       self.model = opts.fetch :model
       self.identifier = opts.fetch :identifier
+      self.identifier = opts[:identifier] || opts[:identifiers] || raise("Option :identifier or :identifiers is required")
       self.globals = (opts[:globals] || {}).reduce({}) { |a, (global, patterns)|
         a[global] = patterns.reduce({}) { |aa, (path, methods)|
           aa[path] = methods == :any ? :any : Set.new(Array(methods).map { |m| m.to_s.upcase })
@@ -74,22 +76,26 @@ module MultiTenant
     # Rack request call
     def call(env)
       tenant_class.current = nil
-      impl = tenant_class.multi_tenant_impl
 
       request = Rack::Request.new env
-      tenant_identifier = identifier.(request)
+      id_resp = identifier.(request)
+      records_or_identifiers = Array(id_resp)
 
-      if (matching_globals = impl.matching_globals(tenant_identifier, globals)).any?
-        allowed = matching_globals.any? { |allowed_paths|
+      if (matching = matching_globals(records_or_identifiers)).any?
+        allowed = matching.any? { |allowed_paths|
           path_matches?(request, allowed_paths)
         }
-        return allowed ? @app.call(env) : not_found.(tenant_identifier)
+        return @app.call(env) if allowed
 
-      elsif (tenant_class.current = tenant_identifier) and tenant_class.current?
+        ids = identifiers records_or_identifiers
+        return not_found.(id_resp.is_a?(Array) ? ids : ids[0])
+
+      elsif (tenant_query.current_tenants = records_or_identifiers) and tenant_class.current?
         return @app.call env
 
       else
-        return not_found.(tenant_identifier)
+        ids = identifiers records_or_identifiers
+        return not_found.(id_resp.is_a?(Array) ? ids : ids[0])
       end
     ensure
       tenant_class.current = nil
@@ -101,11 +107,35 @@ module MultiTenant
       }
     end
 
-    # Infers and returns the tenant model class this middleware is handling
-    def tenant_class
-      @tenant_class ||= if self.model.respond_to?(:call)
+    def matching_globals(records_or_identifiers)
+      identifiers(records_or_identifiers).reduce([]) { |a, id|
+        a << globals[id] if globals.has_key? id
+        a
+      }
+    end
+
+    def identifiers(records_or_identifiers)
+      records_or_identifiers.map { |x|
+        x.is_a?(tenant_class) ? x.send(tenant_class.tenant_identifier) : x.to_s
+      }
+    end
+
+    def tenant_class(m = self.model)
+      @tenant_class ||= if m.respond_to?(:call)
+        tenant_class m.call
+      elsif m.respond_to? :constantize
+        m.constantize
+      elsif m.respond_to? :model
+        m.model
+      else
+        m
+      end
+    end
+
+    def tenant_query
+      @tenant_query ||= if self.model.respond_to?(:call)
         self.model.call
-      elsif self.model.respond_to?(:constantize)
+      elsif self.model.respond_to? :constantize
         self.model.constantize
       else
         self.model

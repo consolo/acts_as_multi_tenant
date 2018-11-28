@@ -39,7 +39,7 @@ class MiddlewareTest < Minitest::Test
       model: Client.active,
       identifier: ->(req) { 'foo' }
     })
-    assert_equal Client.active, ware.tenant_class
+    assert_equal Client, ware.tenant_class
   end
 
   def test_model_works_as_string
