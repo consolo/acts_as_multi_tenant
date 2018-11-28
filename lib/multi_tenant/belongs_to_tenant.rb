@@ -35,7 +35,13 @@ module MultiTenant
 
       default_scope {
         current = tenant_class.current_tenants.map(&tenant_primary_key)
-        current.any? ? where({tenant_foreign_key => current}) : where('1=1')
+        if current.size == 1
+          where({tenant_foreign_key => current.first})
+        elsif current.any?
+          where({tenant_foreign_key => current})
+        else
+          where("1=1")
+        end
       }
     end
 
