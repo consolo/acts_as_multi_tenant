@@ -61,7 +61,6 @@ module MultiTenant
     def initialize(app, opts)
       @app = app
       self.model = opts.fetch :model
-      self.identifier = opts.fetch :identifier
       self.identifier = opts[:identifier] || opts[:identifiers] || raise("Option :identifier or :identifiers is required")
       self.globals = (opts[:globals] || {}).reduce({}) { |a, (global, patterns)|
         a[global] = patterns.reduce({}) { |aa, (path, methods)|
