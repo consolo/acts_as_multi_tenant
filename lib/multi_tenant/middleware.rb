@@ -115,7 +115,7 @@ module MultiTenant
 
     def identifiers(records_or_identifiers)
       records_or_identifiers.map { |x|
-        if x.class.respond_to?(:model_name) and x.class.model_name.to_s == tenant_class.model_name.to_s
+        if x.class.respond_to?(:table_name) and x.class.table_name == tenant_class.table_name
           x.send tenant_class.tenant_identifier
         else
           x.to_s

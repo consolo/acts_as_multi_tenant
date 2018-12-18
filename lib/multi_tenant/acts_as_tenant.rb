@@ -102,7 +102,9 @@ module MultiTenant
       # @param records_or_identifiers array of the records or identifiers in the 'tenant_identifier' column.
       #
       def current_tenants=(records_or_identifiers)
-        records, identifiers = Array(records_or_identifiers).partition { |x| x.is_a? self }
+        records, identifiers = Array(records_or_identifiers).partition { |x|
+          x.class.respond_to?(:table_name) && x.class.table_name == self.table_name
+        }
         tenants = if identifiers.any?
                     records + where({tenant_identifier => identifiers}).to_a
                   else
