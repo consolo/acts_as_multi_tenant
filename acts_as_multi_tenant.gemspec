@@ -14,5 +14,5 @@ Gem::Specification.new do |s|
   s.files = [Dir.glob('lib/**/*'), 'LICENSE', 'README.md'].flatten
   s.required_ruby_version = '>= 2.1.0'
   s.add_runtime_dependency 'activerecord', ['>= 4.2', '< 6.0']
-  s.add_runtime_dependency 'rack', '~> 0'
+  s.add_runtime_dependency 'rack'
 end
