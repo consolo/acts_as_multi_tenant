@@ -62,8 +62,18 @@ class ActsAsTenantTest < Minitest::Test
     client_class.current = 'foo'
     refute_nil client_class.current
     assert_equal 'foo', client_class.current.code
+  end
 
-    client_class.current = 'bar'
+  def test_current_raises_if_not_found
+    client_class = Class.new ActiveRecord::Base do
+      self.table_name = 'clients'
+      acts_as_tenant using: :code
+    end
+
+    assert_nil client_class.current
+    assert_raises MultiTenant::TenantsNotFound do
+      client_class.current = 'bar'
+    end
     assert_nil client_class.current
   end
 
