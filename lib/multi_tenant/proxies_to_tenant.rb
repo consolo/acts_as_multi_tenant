@@ -1,4 +1,7 @@
 module MultiTenant
+  # An exception indicating a tenant with a missing or invalid proxy identifier
+  NilProxyError = Class.new(RuntimeError)
+
   #
   # Helpers for setting a proxy model to your tenant model. So your records can `acts_as_tenant` to the proxy model instead of directly to the tenant.
   #
@@ -84,7 +87,14 @@ module MultiTenant
       def current_tenants
         proxied_tenant_class
           .current_tenants
-          .map(&proxied_tenant_inverse_assoc)
+          .map { |tenant|
+            if (proxy = tenant.send(proxied_tenant_inverse_assoc))
+              proxy
+            else
+              tenant_id = tenant.send(proxied_tenant_class.primary_key)
+              raise ::MultiTenant::NilProxyError, "Missing proxy for tenant #{proxied_tenant_class.name}##{tenant_id}"
+            end
+          }
       end
     end
 

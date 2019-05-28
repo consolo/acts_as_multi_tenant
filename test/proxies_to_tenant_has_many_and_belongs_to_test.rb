@@ -88,4 +88,17 @@ class ProxiesToTenantHasManyAndBelongsToTest < Minitest::Test
       assert_equal %w(E), Widget.pluck(:name)
     end
   end
+
+  def test_nothing_is_found_without_a_license
+    client = Client.create!(code: 'no-lic')
+    Client.with_tenant 'no-lic' do
+      assert_raises MultiTenant::NilProxyError do
+        License.current_tenant
+      end
+
+      assert_raises MultiTenant::NilProxyError do
+        Widget.count
+      end
+    end
+  end
 end
