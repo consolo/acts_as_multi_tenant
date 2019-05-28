@@ -12,9 +12,10 @@ module MultiTenant
     # @param using [String] (optional) column that contains the unique lookup identifier. Defaults to :code.
     #
     def acts_as_tenant(using: :code)
-      cattr_accessor :tenant_identifier, :tenant_thread_var
+      cattr_accessor :tenant_identifier, :tenant_thread_var, :raise_on_tenant_not_found
       self.tenant_identifier = using
       self.tenant_thread_var = "current_tenant_#{object_id}".freeze # allows there to be multiple tenant classes
+      self.raise_on_tenant_not_found = true
       self.extend MultiTenant::ActsAsTenant::TenantGetters
       self.extend MultiTenant::ActsAsTenant::TenantSetters
       self.extend MultiTenant::ActsAsTenant::TenantHelpers
@@ -102,11 +103,15 @@ module MultiTenant
       # @param records_or_identifiers array of the records or identifiers in the 'tenant_identifier' column.
       #
       def current_tenants=(records_or_identifiers)
-        records, identifiers = Array(records_or_identifiers).partition { |x|
+        records, identifiers = Array(records_or_identifiers.uniq).partition { |x|
           x.class.respond_to?(:table_name) && x.class.table_name == self.table_name
         }
         tenants = if identifiers.any?
-                    records + where({tenant_identifier => identifiers}).to_a
+                    queried_records = where({tenant_identifier => identifiers}).to_a
+                    if queried_records.size != identifiers.size and raise_on_tenant_not_found
+                      raise ::MultiTenant::TenantsNotFound.new(self, identifiers, queried_records)
+                    end
+                    records + queried_records
                   else
                     records
                   end

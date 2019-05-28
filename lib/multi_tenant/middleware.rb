@@ -96,6 +96,10 @@ module MultiTenant
         ids = identifiers records_or_identifiers
         return not_found.(id_resp.is_a?(Array) ? ids : ids[0])
       end
+
+    rescue ::MultiTenant::TenantsNotFound => e
+      ids = e.not_found
+      not_found.(id_resp.is_a?(Array) ? ids : ids[0])
     ensure
       tenant_class.current = nil
     end
