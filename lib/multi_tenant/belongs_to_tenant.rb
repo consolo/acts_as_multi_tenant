@@ -61,8 +61,11 @@ module MultiTenant
       # Assign this model to the current tenant (if any). If there are multiple current tenants this is a no-op.
       #
       def assign_to_current_tenant
-        if self.class.tenant_class.current_tenants.size == 1
-          current_tenant_id = self.class.tenant_class.current_tenant.send(self.class.tenant_primary_key)
+        code_col = self.class.tenant_class.tenant_identifier
+        current = self.class.tenant_class.current_tenants
+
+        if current.size == 1 or current.map(&code_col).uniq.size == 1
+          current_tenant_id = self.class.tenant_class.current_tenants.first.send(self.class.tenant_primary_key)
           send "#{self.class.tenant_foreign_key}=", current_tenant_id
         end
       end

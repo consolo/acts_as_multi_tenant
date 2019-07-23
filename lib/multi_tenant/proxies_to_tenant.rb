@@ -61,6 +61,7 @@ module MultiTenant
       self.proxied_tenant_inverse_scope = scope
 
       extend MultiTenant::ActsAsTenant::TenantGetters
+      extend TenantInterface
       extend case [ref.macro, ref.inverse_of.macro]
              when [:has_many, :belongs_to], [:has_one, :belongs_to], [:belongs_to, :has_one]
                ProxiesToTenantSingularInverseAssociation
@@ -77,6 +78,16 @@ module MultiTenant
     #
     def proxies_to_tenant?
       respond_to? :proxied_tenant_class
+    end
+
+    #
+    # Class methods to give this the same interface as a "real" tenant class.
+    #
+    module TenantInterface
+      # Returns the tenant_identifier from the proxied class
+      def tenant_identifier
+        self.proxied_tenant_class.tenant_identifier
+      end
     end
 
     #
