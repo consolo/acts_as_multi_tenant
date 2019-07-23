@@ -20,9 +20,9 @@ class MultipleCurrentTest < Minitest::Test
   end
 
   def setup
-    @client1 = Client.create!(code: "foo")
-    @client2 = Client.create!(code: "bar")
-    @client3 = Client.create!(code: "zorp")
+    @client1 = Client.create!(uuid: SecureRandom.uuid, code: "foo")
+    @client2 = Client.create!(uuid: SecureRandom.uuid, code: "bar")
+    @client3 = Client.create!(uuid: SecureRandom.uuid, code: "zorp")
   end
 
   def teardown
@@ -48,6 +48,17 @@ class MultipleCurrentTest < Minitest::Test
 
     Client.current_tenants = [@client1.code, @client2.code]
     assert_equal [@client1, @client2], Client.current_tenants
+  end
+
+  def test_shared_code
+    Client.delete_all
+    @client1 = Client.create!(uuid: SecureRandom.uuid, code: "foo")
+    @client2 = Client.create!(uuid: SecureRandom.uuid, code: "foo")
+    @client3 = Client.create!(uuid: SecureRandom.uuid, code: "bar")
+
+    assert_equal [], Client.current_tenants
+    Client.current_tenant = "foo"
+    assert_equal [@client1.uuid, @client2.uuid].sort, Client.current_tenants.map(&:uuid).sort
   end
 
   def test_isolates_records

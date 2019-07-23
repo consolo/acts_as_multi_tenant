@@ -108,7 +108,7 @@ module MultiTenant
         }
         tenants = if identifiers.any?
                     queried_records = where({tenant_identifier => identifiers}).to_a
-                    if queried_records.size != identifiers.size and raise_on_tenant_not_found
+                    if queried_records.size < identifiers.size and raise_on_tenant_not_found
                       raise ::MultiTenant::TenantsNotFound.new(self, identifiers, queried_records)
                     end
                     records + queried_records
