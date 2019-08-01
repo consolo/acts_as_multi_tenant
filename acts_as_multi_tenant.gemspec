@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
   s.licenses = ['MIT']
   s.summary = "An ActiveRecord plugin for multi-tenant databases"
   s.description = "An ActiveRecord plugin for multi-tenant databases"
-  s.date = '2019-06-23'
+  s.date = '2019-08-01'
   s.authors = ['Jordan Hollinger', 'Andrew Coleman', 'Taylor Redden']
   s.email = 'jordan.hollinger@gmail.com'
   s.homepage = 'https://github.com/consolo/acts_as_multi_tenant'
