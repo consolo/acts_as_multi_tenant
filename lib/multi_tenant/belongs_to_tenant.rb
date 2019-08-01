@@ -65,8 +65,11 @@ module MultiTenant
         current = self.class.tenant_class.current_tenants
 
         if current.size == 1 or current.map(&code_col).uniq.size == 1
-          current_tenant_id = self.class.tenant_class.current_tenants.first.send(self.class.tenant_primary_key)
-          send "#{self.class.tenant_foreign_key}=", current_tenant_id
+          tenant_fkey = self.class.tenant_foreign_key
+          if send(tenant_fkey).nil? or !current.map(&self.class.tenant_primary_key).include? send(tenant_fkey)
+            current_tenant_id = self.class.tenant_class.current_tenants.first.send(self.class.tenant_primary_key)
+            send "#{tenant_fkey}=", current_tenant_id
+          end
         end
       end
 

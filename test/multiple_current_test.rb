@@ -61,6 +61,45 @@ class MultipleCurrentTest < Minitest::Test
     assert_equal [@client1.uuid, @client2.uuid].sort, Client.current_tenants.map(&:uuid).sort
   end
 
+  def test_doesnt_set_client_id
+    Client.current_tenants = [@client1, @client2]
+    w = Widget.new(name: "Foo")
+    refute w.save
+    assert_includes w.errors.full_messages, "Client can't be blank"
+  end
+
+  def test_sets_client_id_if_all_share_identifier
+    @client1.update_column(:code, "foo")
+    @client2.update_column(:code, "foo")
+
+    Client.current_tenants = [@client1, @client2]
+    w = Widget.new(name: "Foo")
+    assert w.save
+    assert_equal @client1.id, w.client_id
+  end
+
+  def test_overwrites_client_id_if_its_wrong
+    @client1.update_column(:code, "foo")
+    @client2.update_column(:code, "foo")
+
+    Client.current_tenants = [@client1, @client2]
+    w = Widget.new(name: "Foo")
+    w.client_id = @client3.id
+    assert w.save
+    assert_equal @client1.id, w.client_id
+  end
+
+  def test_doesnt_overwrite_client_id_if_its_right
+    @client1.update_column(:code, "foo")
+    @client2.update_column(:code, "foo")
+
+    Client.current_tenants = [@client1, @client2]
+    w = Widget.new(name: "Foo")
+    w.client_id = @client2.id
+    assert w.save
+    assert_equal @client2.id, w.client_id
+  end
+
   def test_isolates_records
     _widget1 = Widget.create!(client_id: @client1.id, name: 'Foo')
     _widget2 = Widget.create!(client_id: @client2.id, name: 'Bar')
