@@ -1,6 +1,8 @@
 # acts_as_multi_tenant
 
-Keep multiple tenants in a single ActiveRecord database and keep their data separate. Let's say the `Client` AR model represents your "tenants". Rack middleware will keep track of the current client in the request cycle which will automatically filter *all ActiveRecord queries* by that client. New records will automatically be associated to that client as well.
+Keep multiple tenants in a single ActiveRecord database and keep their data separate.
+
+Let's say the `Client` AR model represents your "tenants". Rack middleware will keep track of the current client in the request cycle (in a thread-safe way) which will automatically filter *all ActiveRecord queries* by that client. New records will automatically be associated to that client as well.
 
 There are 3 main components:
 
@@ -18,7 +20,8 @@ use MultiTenant::Middleware,
   # Can be the class String name, a Proc, the class itself, or the class + a scope.
   model: -> { Client.active },
 
-  # (required) Fetch the identifier of the current tenant from a Rack::Request object
+  # (required) Fetch the identifier of the current tenant from a Rack::Request object.
+  # In this example it's the subdomain, but it could be anything.
   identifier: ->(req) { req.host.split(/\./)[0] },
 
   # (optional) A Hash of fake identifiers that should be allowed through. Each identifier will have a
@@ -33,7 +36,7 @@ use MultiTenant::Middleware,
   },
 
   # (optional) Returns a Rack response when a tenant couldn't be found in the db (excluding globals),
-  # or when a tenant isn't given.
+  # or when a tenant isn't given. This example contains the default response.
   not_found: ->(x) {
     body = {errors: ["'%s' is not a valid tenant!" % x]}.to_json
     [400, {'Content-Type' => 'application/json', 'Content-Length' => body.size.to_s}, [body]]
@@ -64,55 +67,36 @@ class Spline < ActiveRecord::Base
 end
 ```
 
-## belongs_to_tenant_through
+That's it! As long as the Rack middlware is set up, and your code is running within the request/response cycle, your queries will automatically filter by the current Client, and new records will automatically be assiciated to it.
 
-Maybe you have a model that indirectly belongs to several tenants. For example, a User may have multiple Memberships, each of which belongs to a different Client.
+**Manual usage**
 
-```ruby
-class User < ActiveRecord::Base
-  has_many :memberships
-  belongs_to_tenant_through :memberships
-end
-
-class Membership < ActiveRecord::Base
-  belongs_to_tenant :client
-  belongs_to :user
-end
-```
-
-## proxies_to_tenant
-
-Let's say you need a layer of indirection between clients and their records, to allow multiple clients to all share their records. Let's call it a License: several clients can be signed onto a single license, and records are associated to the license itself. Therefore, all clients with that license will share a single pool of records.
-
-See the full documenation for MultiTenant::ProxiesToTenant for a list of compatible association configurations. But here's on example of a valid configuration:
+For code that doesn't run during the request/response cycle, there are manual ways to get and set the current tenant.
 
 ```ruby
-# The tenant model that's hooked up to the Rack middleware and holds the "current" tenant
-class Client < ActiveRecord::Base
-  belongs_to :license
-  acts_as_tenant
+# Get the current client
+client = Client.current_tenant
+
+# Set the current client
+Client.current_tenant = client
+# Or
+Client.current_tenant = "the client's code"
+
+Client.with_tenant "code" do
+  # Client.current_tenant will be set in this block,
+  # then set back to whatever it was before
 end
 
-# The proxy model that's (potentially) associated with multiple tenants
-class License < ActiveRecord::Base
-  has_many :clients, inverse_of: :license
-  proxies_to_tenant :clients
+Client.without_tenant do
+  # Client.current_tenant will be UNset in this block,
+  # then set back to whatever it was before
 end
 
-# Widets will be associated to a License (instead of a Client), therefore they are automatically
-# shared with all Clients who use that License.
-class Widget < ActiveRecord::Base
-  belongs_to_tenant :license
-  has_many :clients, through: :license # not required - just for clarity
+Client.with_each_tenant do
+  # The block will be called N times, one for each
+  # tenant. Client.current_tenant will be set to that
+  # client.
 end
-
-# Splines, on the other hand, still belong directly to individual Clients like normal.
-class Spline < ActiveRecord::Base
-  belongs_to_tenant :client
-end
-
-# This is how it works behind the scenes
-License.current == Client.current.license
 ```
 
 ## Multiple current tenants
