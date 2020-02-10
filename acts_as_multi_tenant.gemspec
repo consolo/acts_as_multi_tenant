@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.homepage = 'https://github.com/consolo/acts_as_multi_tenant'
   s.require_paths = ['lib']
   s.files = [Dir.glob('lib/**/*'), 'LICENSE', 'README.md'].flatten
-  s.required_ruby_version = '>= 2.1.0'
-  s.add_runtime_dependency 'activerecord', ['>= 4.2', '< 6.0']
+  s.required_ruby_version = '>= 2.3.0'
+  s.add_runtime_dependency 'activerecord', ['>= 4.2', '< 6.1']
   s.add_runtime_dependency 'rack'
 end

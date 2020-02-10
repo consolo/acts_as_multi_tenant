@@ -10,11 +10,12 @@ gem 'activerecord', {
   '5.0' => '~> 5.0.5',
   '5.1' => '~> 5.1.6',
   '5.2' => '~> 5.2.0',
+  '6.0' => '~> 6.0.0',
 }[ENV['AR']]
 
 group :test do
   gem 'minitest'
-  gem 'otr-activerecord', '~> 1.2.5'
+  gem 'otr-activerecord', '~> 1.4'
   gem 'sqlite3'
   gem 'database_cleaner'
 end
